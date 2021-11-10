@@ -1,0 +1,418 @@
+/*
+ * Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/clock/msm-clocks-8953.h>
+
+&soc {
+	i2c@78b7000 { /* BLSP1 QUP3 */
+		status = "okay";
+		synaptics@4b {
+			compatible = "synaptics,dsx-i2c";
+			reg = <0x4b>;
+			interrupt-parent = <&tlmm>;
+			interrupts = <65 0x2008>;
+			vdd_ana-supply = <&vdd_vreg>;
+			vcc_i2c-supply = <&pm8953_l6>;
+			synaptics,pwr-reg-name = "vdd_ana";
+			synaptics,bus-reg-name = "vcc_i2c";
+			synaptics,irq-gpio = <&tlmm 65 0x2008>;
+			synaptics,irq-on-state = <0>;
+			synaptics,irq-flags = <0x2008>;
+			synaptics,power-delay-ms = <200>;
+			synaptics,reset-delay-ms = <200>;
+			synaptics,max-y-for-2d = <1919>;
+			synaptics,cap-button-codes = <139 158 172>;
+			synaptics,vir-button-codes = <139 180 2000 320 160
+						      158 540 2000 320 160
+						      172 900 2000 320 160>;
+			synaptics,resume-in-workqueue;
+			/* Underlying clocks used by secure touch */
+			clock-names = "iface_clk", "core_clk";
+			clocks = <&clock_gcc clk_gcc_blsp1_ahb_clk>,
+				 <&clock_gcc clk_gcc_blsp1_qup3_i2c_apps_clk>;
+		};
+	};
+
+	vdd_vreg: vdd_vreg {
+		compatible = "regulator-fixed";
+		status = "ok";
+		regulator-name = "vdd_vreg";
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		label = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&gpio_key_active>;
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&tlmm 85 0x1>;
+			linux,input-type = <1>;
+			linux,code = <115>;
+			debounce-interval = <15>;
+			linux,can-disable;
+			gpio-key,wakeup;
+		};
+
+		force_usb_boot {
+			label = "force_boot";
+			gpios = <&tlmm 37 0x1>;
+			linux,input-type = <1>;
+			linux,code = <240>;
+			debounce-interval = <15>;
+			linux,can-disable;
+			gpio-key,wakeup;
+		};
+	};
+};
+
+&blsp1_uart0 {
+	status = "ok";
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart_console_active>;
+};
+
+&pm8953_gpios {
+	nfc_clk {
+		nfc_clk_default: nfc_clk_default {
+			pins = "gpio2";
+			function = "normal";
+			input-enable;
+			power-source = <1>;
+		};
+	};
+};
+
+/*
+&pmi632_gpios {
+	pmi632_gpio1 {
+		// Disable GPIO1 for h/w base mitigation //
+		pmi632_gpio1_default: pmi632_gpio1_default {
+			pins = "gpio1";
+			function = "normal"; // normal output //
+			power-source = <0>; // VIN0 //
+			output-high; // digital output, no invert //
+			input-disable; // prevent GPIO from being set to DIO //
+		};
+	};
+};
+*/
+
+&i2c_5 { /* BLSP2 QUP1 (NFC) */
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	status = "ok";
+	nq@28 {
+		compatible = "qcom,nq-nci";
+		reg = <0x28>;
+		qcom,nq-irq = <&tlmm 17 0x00>;
+		qcom,nq-ven = <&tlmm 16 0x00>;
+		qcom,nq-firm = <&tlmm 62 0x00>;
+		qcom,nq-clkreq = <&pm8953_gpios 2 0x00>;
+		qcom,nq-esepwr = <&tlmm 141 0x00>;
+		interrupt-parent = <&tlmm>;
+		qcom,clk-src = "BBCLK2";
+		interrupts = <17 0>;
+		interrupt-names = "nfc_irq";
+		pinctrl-names = "nfc_active", "nfc_suspend";
+		pinctrl-0 = <&nfc_int_active &nfc_disable_active
+						&nfc_clk_default>;
+		pinctrl-1 = <&nfc_int_suspend &nfc_disable_suspend>;
+		clocks = <&clock_gcc clk_bb_clk2_pin>;
+		clock-names = "ref_clk";
+	};
+};
+
+&i2c_8 { /* BLSP2 QUP4 */
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	status = "ok";
+	lt9611@3b {
+		compatible = "lontium,lt9611";
+		reg = <0x3b>;
+		lt,pwr-sys1v8-gpio = <&tlmm 87 0x00>;
+		lt,pwr-sys3v3-gpio = <&tlmm 33 0x00>;
+		lt,reset-gpio = <&tlmm 38 0x00>;
+		lt,irq-gpio = <&tlmm 140 0x00>;
+		lt,video-format-id = <4>;
+		lt,mipi-lanes-type = <0>; /* 4 lane */
+		lt,mipi-ports-type = <0>; /* single port */
+		lt,instance_id = <0>;
+		lt,chipname = "lt9611";
+	};
+	sn65@2c {
+		compatible = "sn65,dsi84";
+		reg = <0x2c>;
+		vdd-supply = <&pm8953_l5>;
+		vcc_i2c-supply = <&pm8953_l5>;
+		sn65,vdd-supply-voltage = <1800000 1800000>;
+		sn65dsi84,en-gpio = <&tlmm 141 0x00>;
+		sn65dsi84,res-1080p;         /* 1280x720 or 1280x960  */
+		sn65dsi84,wait = <10>; /* wait(ms) after chip enable */
+		//sn65dsi84,reg-dump;   /* dump sn65dsi84 registers for debug purpose */
+		//sn65dsi84,colorbar;   /* display colorbar for debug purpose */
+		sn65dsi84,colorbar-command = [09 01 00 /* <reg value wait(ms)> */
+			0d 00 00
+			0a 05 00
+			0b 20 00
+			10 26 00
+			11 00 00
+			12 51 00
+			13 00 00
+			18 6c 00
+			19 00 00
+			1a 03 00
+			1b 00 00
+			20 c0 00    //width 1920
+			21 03 00
+			22 00 00
+			23 00 00
+			24 38 00
+			25 04 00
+			26 00 00
+			27 00 00
+			28 cd 00
+			29 00 00
+			2a 00 00
+			2b 00 00
+			2c 19 00
+			2d 00 00
+			2e 00 00
+			2f 00 00
+			30 0a 00
+			31 00 00
+			32 00 00
+			33 00 00
+			34 19 00
+			35 00 00
+			36 0a 00
+			37 00 00
+			38 28 00
+			39 00 00
+			3a 1e 00
+			3b 00 00
+			3c 10 00  /* enable colorbar */
+			3d 00 00
+			3e 00 00
+			09 00 00
+			0d 01 00];
+		sn65dsi84,on-command-720p = [09 01 00
+			0d 00 00
+			0a 04 00
+			0b 02 00
+			10 20 00
+			11 00 00
+			12 30 00
+			13 00 00
+			18 6f 00
+			19 00 00
+			1a 03 00
+			1b 00 00
+			20 00 00 /* width-l(a) */
+			21 05 00 /* width-h(a) */
+			22 00 00 /* width-l(b) */
+			23 00 00 /* width-h(b) */
+			24 d0 00 /* height-l(a) */
+			25 02 00 /* Height-h(a) */
+			26 00 00 /* height-l(b) */
+			27 00 00 /* height-h(b) */
+			28 80 00 /* sync delay low(a) */
+			29 02 00 /* sync delay high(a) */
+			2a 00 00 /* sync delay low(b) */
+			2b 00 00 /* sync delay high(b) */
+			2c 10 00 /* hpw-l(a) */
+			2d 00 00 /* hpw-h(a) */
+			2e 00 00 /* hpw-l(b) */
+			2f 00 00 /* hpw-h(b) */
+			30 06 00 /* vpw-l(a) */
+			31 00 00 /* vpw-h(a) */
+			32 00 00 /* vpw-l(b) */
+			33 00 00 /* vpw-h(b) */
+			34 05 00 /* hbp(a) */
+			35 00 00 /* hbp(b) */
+			36 14 00 /* vbp(a) */
+			37 00 00 /* vbp(b) */
+			38 26 00 /* hfp(a) */
+			39 00 00 /* hfp(b) */
+			3a fe 00 /* vfp(a) */
+			3b 00 00 /* vfp(b) */
+			3c 00 00 /* bit4 channel a test pattern; bit0 - channel b test pattern */
+			3d 00 00
+			3e 00 00
+		    09 00 00
+		    0d 01 00];
+	    sn65dsi84,on-command-960p = [09 01 00 /* <reg value wait(ms)> */
+			0d 00 00
+			0a 04 00
+			0b 02 00
+			10 20 00
+			11 00 00
+			12 30 00
+			13 00 00
+			18 6f 00
+			19 00 00
+			1a 03 00
+			1b 00 00
+			20 00 00 /* width-l(a) */
+			21 05 00 /* width-h(a) */
+			22 00 00 /* width-l(b) */
+			23 05 00 /* width-h(b) */
+			24 c0 00 /* height-l(a) */
+			25 03 00 /* Height-h(a) */
+			26 c0 00 /* height-l(b) */
+			27 03 00 /* height-h(b) */
+			28 80 00 /* sync delay low(a) */
+			29 02 00 /* sync delay high(a) */
+			2a 00 00 /* sync delay low(b) */
+			2b 00 00 /* sync delay high(b) */
+			2c 10 00 /* hpw-l(a) */
+			2d 00 00 /* hpw-h(a) */
+			2e 00 00 /* hpw-l(b) */
+			2f 00 00 /* hpw-h(b) */
+			30 06 00 /* vpw-l(a) */
+			31 00 00 /* vpw-h(a) */
+			32 00 00 /* vpw-l(b) */
+			33 06 00 /* vpw-h(b) */
+			34 10 00 /* hbp(a) */
+			35 10 00 /* hbp(b) */
+			36 14 00 /* vbp(a) */
+			37 14 00 /* vbp(b) */
+			38 26 00 /* hfp(a) */
+			39 26 00 /* hfp(b) */
+			3a 0e 00 /* vfp(a) */
+			3b 0e 00 /* vfp(b) */
+			3c 00 00 /* bit4 channel a test pattern; bit0 - channel b test pattern */
+			3d 00 00
+			3e 00 00
+			09 00 00
+			0d 01 00];
+		sn65dsi84,on-command-1080p = [09 01 00 /* <reg value wait(ms)> */
+			0d 00 00
+			0a 05 00
+			0b 20 00
+			10 26 00
+			11 00 00
+			12 51 00
+			13 00 00
+			18 6c 00
+			19 00 00
+			1a 03 00
+			1b 00 00
+			20 80 00    /* width-l(a) */
+			21 07 00    /* width-h(a) */
+			22 00 00    /* width-l(b) */
+			23 00 00    /* width-h(b) */
+			24 38 00    /* height-l(a) */
+			25 04 00    /* Height-h(a) */
+			26 00 00    /* height-l(b) */
+			27 00 00    /* height-h(b) */
+			28 80 00    /* sync delay low(a) */
+			29 02 00    /* sync delay high(a) */
+			2a 00 00    /* sync delay low(b) */
+			2b 00 00    /* sync delay high(b) */
+			2c 19 00    /* hpw-l(a) */
+			2d 00 00    /* hpw-h(a) */
+			2e 00 00    /* hpw-l(b) */
+			2f 00 00    /* hpw-h(b) */
+			30 0a 00    /* vpw-l(a) */
+			31 00 00    /* vpw-h(a) */
+			32 00 00    /* vpw-l(b) */
+			33 00 00    /* vpw-h(b) */
+			34 19 00    /* hbp(a) */
+			35 00 00    /* hbp(b) */
+			36 0a 00    /* vbp(a) */
+			37 00 00    /* vbp(b) */
+			38 28 00    /* hfp(a) */
+			39 00 00    /* hfp(b) */
+			3a 1e 00    /* vfp(a) */
+			3b 00 00    /* vfp(b) */
+			3c 00 00    /* bit4 channel a test pattern; bit0 - channel b test pattern */
+			3d 00 00
+			3e 00 00
+			09 00 00
+			0d 01 00];
+		sn65dsi84,off-command = [0d 00 00];
+	    };
+/*
+		mcp4725@60 {
+			compatible = "mcp4725";
+			pinctrl-names = "default"; //¡ø because of the default SW will set the config as "gpio16_dig_out_default" when init.
+			pinctrl-0 = <&pmi632_gpio1_default>;
+			test-gpios = <&pmi632_gpios 1 GPIO_ACTIVE_HIGH>;
+			reg = <0x60>;
+			vcc_i2c-supply = <&pm8953_l5>;
+	    };
+*/
+    };
+
+&sdhc_1 {
+	/* device core power supply */
+	vdd-supply = <&pm8953_l8>;
+	qcom,vdd-voltage-level = <2900000 2900000>;
+	qcom,vdd-current-level = <200 570000>;
+
+	/* device communication power supply */
+	vdd-io-supply = <&pm8953_l5>;
+	qcom,vdd-io-always-on;
+	qcom,vdd-io-lpm-sup;
+	qcom,vdd-io-voltage-level = <1800000 1800000>;
+	qcom,vdd-io-current-level = <200 325000>;
+
+	pinctrl-names = "active", "sleep";
+	pinctrl-0 = <&sdc1_clk_on &sdc1_cmd_on &sdc1_data_on  &sdc1_rclk_on>;
+	pinctrl-1 = <&sdc1_clk_off &sdc1_cmd_off &sdc1_data_off &sdc1_rclk_off>;
+
+	qcom,clk-rates = <400000 20000000 25000000 50000000 100000000 192000000
+								384000000>;
+	qcom,nonremovable;
+	qcom,bus-speed-mode = "HS400_1p8v", "HS200_1p8v", "DDR_1p8v";
+
+	status = "ok";
+};
+
+&sdhc_2 {
+	/* device core power supply */
+	vdd-supply = <&pm8953_l11>;
+	qcom,vdd-voltage-level = <2950000 2950000>;
+	qcom,vdd-current-level = <15000 800000>;
+
+	/* device communication power supply */
+	vdd-io-supply = <&pm8953_l12>;
+	qcom,vdd-io-voltage-level = <1800000 2950000>;
+	qcom,vdd-io-current-level = <200 22000>;
+
+	pinctrl-names = "active", "sleep";
+	pinctrl-0 = <&sdc2_clk_on &sdc2_cmd_on &sdc2_data_on &sdc2_cd_on>;
+	pinctrl-1 = <&sdc2_clk_off &sdc2_cmd_off &sdc2_data_off>;
+
+	#address-cells = <0>;
+	interrupt-parent = <&sdhc_2>;
+	interrupts = <0 1 2>;
+	#interrupt-cells = <1>;
+	interrupt-map-mask = <0xffffffff>;
+	interrupt-map = <0 &intc 0 125 0
+		1 &intc 0 221 0
+		2 &tlmm 133 0>;
+	interrupt-names = "hc_irq", "pwr_irq", "status_irq";
+	cd-gpios = <&tlmm 133 0x1>;
+
+	qcom,clk-rates = <400000 20000000 25000000 50000000 100000000
+								200000000>;
+	qcom,bus-speed-mode = "SDR12", "SDR25", "SDR50", "DDR50", "SDR104";
+
+	status = "ok";
+};
